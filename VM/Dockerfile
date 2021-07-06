@@ -24,8 +24,12 @@ RUN apt-get update \
        php8.0-msgpack php8.0-igbinary php8.0-ldap \
        php8.0-redis \
     && php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer \
-    && curl -sL https://deb.nodesource.com/setup_15.x | bash - \
+    && curl -sL https://deb.nodesource.com/setup_16.x | bash - \
     && apt-get install -y nodejs \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list \
+    && apt-get update \
+    && apt-get install -y yarn \
     && apt-get -y autoremove \
     && apt-get clean \
     && apt-get install -y zsh \
@@ -33,6 +37,55 @@ RUN apt-get update \
     && apt-get install -y php-xdebug \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && wget https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh -O - | zsh || true
+
+RUN apt-get update \
+    && apt-get install -y python3-pip \
+    && pip3 --version \
+    && python3 -m pip install cx_Oracle --upgrade --user
+
+ARG INSTALL_OCI8=true
+ARG ORACLE_INSTANT_CLIENT_MIRROR=https://github.com/diogomascarenha/oracle-instantclient/raw/master/
+
+ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_12_1"
+ENV OCI_HOME="/opt/oracle/instantclient_12_1"
+ENV OCI_LIB_DIR="/opt/oracle/instantclient_12_1"
+ENV OCI_INCLUDE_DIR="/opt/oracle/instantclient_12_1/sdk/include"
+ENV OCI_VERSION=12
+
+RUN if [ ${INSTALL_OCI8} = true ]; then \
+    # Install wget
+    apt-get install --no-install-recommends -yqq wget \
+    # Install Oracle Instantclient
+    && mkdir /opt/oracle \
+        && cd /opt/oracle \
+        && wget ${ORACLE_INSTANT_CLIENT_MIRROR}instantclient-basic-linux.x64-12.1.0.2.0.zip \
+        && wget ${ORACLE_INSTANT_CLIENT_MIRROR}instantclient-sdk-linux.x64-12.1.0.2.0.zip \
+        && unzip /opt/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip -d /opt/oracle \
+        && unzip /opt/oracle/instantclient-sdk-linux.x64-12.1.0.2.0.zip -d /opt/oracle \
+        && ln -s /opt/oracle/instantclient_12_1/libclntsh.so.12.1 /opt/oracle/instantclient_12_1/libclntsh.so \
+        && ln -s /opt/oracle/instantclient_12_1/libclntshcore.so.12.1 /opt/oracle/instantclient_12_1/libclntshcore.so \
+        && ln -s /opt/oracle/instantclient_12_1/libocci.so.12.1 /opt/oracle/instantclient_12_1/libocci.so \
+        && rm -rf /opt/oracle/*.zip \
+        && apt-get update \
+    # Install PHP extensions deps
+    && apt-get install --no-install-recommends -yqq \
+      libaio-dev \
+      freetds-dev && \
+    # Install PHP extensions
+    if [ $(php -r "echo PHP_MAJOR_VERSION;") = "5" ]; then \
+      echo 'instantclient,/opt/oracle/instantclient_12_1/' | pecl install oci8-2.0.10; \
+    else \
+      echo 'instantclient,/opt/oracle/instantclient_12_1/' | pecl install oci8; \
+    fi \
+#        && docker-php-ext-configure pdo_oci --with-pdo-oci=instantclient,/opt/oracle/instantclient_12_1,12.1 \
+#        && docker-php-ext-configure pdo_dblib --with-libdir=/lib/x86_64-linux-gnu \
+#        && docker-php-ext-install \
+#                pdo_oci \
+#        && docker-php-ext-enable \
+#                oci8 \
+    && echo "extension=oci8.so" >> /etc/php/8.0/cli/php.ini \
+    && php -m | grep oci8 \
+  ;fi
 
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.0
 
