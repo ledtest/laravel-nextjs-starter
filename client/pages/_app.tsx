@@ -48,7 +48,7 @@ function MyApp(props: any) {
     return (
         <Provider store={store}>
             <Navbar />
-            <props.Component {...props.pageProps} />;
+            <props.Component {...props.pageProps} />
             {isNoProtectedRoute && <AdvancedFooter />}
         </Provider>
     );
