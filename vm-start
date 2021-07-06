@@ -1,5 +1,11 @@
 #!/bin/bash
 
+echo "【提示】正在检查docker是否启动，若未启动，将为你启动"
+sudo service docker status
+if [ "$?" -eq 1 ]; then
+    sudo service docker start;
+fi
+
 i=1;
 j=$#;
 
